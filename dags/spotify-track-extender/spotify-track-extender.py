@@ -49,7 +49,7 @@ def filter_urls(**kwargs):
     
     try:
         imported_track_urls = get_imported_track_details_task.execute(context=kwargs)
-        filtered_urls = [url for url in urls if url not in imported_track_urls]
+        filtered_urls = [url for sublist in urls for url in sublist if url not in imported_track_urls]
         return filtered_urls
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
@@ -70,6 +70,8 @@ def start_spotify_fetchers(**kwargs):
     ti = kwargs['ti']
     filtered_urls = ti.xcom_pull(task_ids='filter_urls')
     for k in filtered_urls: 
+        print(str(k))
+        print(str(filtered_urls))
         url = filtered_urls[k]
         task = PythonOperator(
             task_id=f"call_spotify_api_and_save_{k}",
