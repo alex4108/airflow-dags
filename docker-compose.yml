@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  airflow:
+    image: apache/airflow:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    depends_on:
+      - postgres
+    volumes:
+      - ./dags:/opt/airflow/dags
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
