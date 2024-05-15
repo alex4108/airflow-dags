@@ -21,6 +21,7 @@ dag = DAG(
     description='A DAG to fetch Spotify track details',
     schedule_interval=timedelta(days=1),
 )
+
 def get_spotify_track_id(url):
     parts = url.split('/')
     track_id = parts[-1]
@@ -54,8 +55,7 @@ def filter_urls(**kwargs):
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
-def call_spotify_api_and_save(**kwargs):
-    url = kwargs['url']
+def call_spotify_api_and_save(url, **kwargs):
     track_details = fetch_track_details(url)
     insert_query = f"INSERT INTO spotify_track_details (url, track_details) VALUES ('{url}', '{track_details}')"
     insert_task = PostgresOperator(
@@ -65,23 +65,6 @@ def call_spotify_api_and_save(**kwargs):
         dag=dag,
     )
     insert_task.execute(context=kwargs)
-
-def start_spotify_fetchers(**kwargs):
-    ti = kwargs['ti']
-    filtered_urls = ti.xcom_pull(task_ids='filter_urls')
-
-    for k in range(0, len(filtered_urls)-1): 
-        print(str(k))
-        print(str(filtered_urls))
-        url = filtered_urls[k]
-        task = PythonOperator(
-            task_id=f"call_spotify_api_and_save_{k}",
-            python_callable=call_spotify_api_and_save,
-            op_kwargs={'url': url},
-            provide_context=True,
-            dag=dag,
-        )
-        task.execute(context=kwargs)
 
 start_task = PostgresOperator(
     task_id='check_db_healthy',
@@ -117,6 +100,32 @@ filter_urls_task = PythonOperator(
     dag=dag,
 )
 
+start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task
+
+# Define and execute the tasks outside of the function
+call_spotify_tasks = []
+filtered_urls = filter_urls_task.output
+
+for i, url in enumerate(filtered_urls):
+    task = PythonOperator(
+        task_id=f'call_spotify_api_and_save_{i}',
+        python_callable=call_spotify_api_and_save,
+        op_kwargs={'url': url},
+        provide_context=True,
+        dag=dag,
+    )
+    call_spotify_tasks.append(task)
+
+filter_urls_task >> call_spotify_tasks
+
+# Execute the tasks asynchronously within the function
+def start_spotify_fetchers(**kwargs):
+    ti = kwargs['ti']
+    for task in call_spotify_tasks:
+        task_instance = kwargs['task_instance']
+        task_instance.run(task)
+    return None
+
 start_spotify_fetchers_task = PythonOperator(
     task_id='start_spotify_fetchers_task',
     python_callable=start_spotify_fetchers,
@@ -124,6 +133,4 @@ start_spotify_fetchers_task = PythonOperator(
     dag=dag,
 )
 
-start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> start_spotify_fetchers_task
-
-
+filter_urls_task >> start_spotify_fetchers_task
