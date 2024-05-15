@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.postgres_operator import PostgresOperator
-from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
+from airflow.operators.python_operator import PythonOperator
 from airflow.exceptions import AirflowFailException
 import requests
 
@@ -66,7 +66,7 @@ def call_spotify_api_and_save(**kwargs):
     )
     insert_task.execute(context=kwargs)
 
-def spawn_spotify_fetchers_task(**kwargs):
+def start_spotify_fetchers(**kwargs):
     ti = kwargs['ti']
     filtered_urls = ti.xcom_pull(task_ids='filter_urls')
     for k, url in filtered_urls: 
@@ -77,6 +77,7 @@ def spawn_spotify_fetchers_task(**kwargs):
             provide_context=True,
             dag=dag,
         )
+        task.execute(context=kwargs)
 
 start_task = PostgresOperator(
     task_id='check_db_healthy',
@@ -112,13 +113,13 @@ filter_urls_task = PythonOperator(
     dag=dag,
 )
 
-spawn_spotify_fetchers_task = PythonOperator(
-    task_id='spawn_spotify_fetchers_task',
-    python_callable=spawn_spotify_fetchers_task,
+start_spotify_fetchers_task = PythonOperator(
+    task_id='start_spotify_fetchers_task',
+    python_callable=start_spotify_fetchers,
     provide_context=True,
     dag=dag,
 )
 
-start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> spawn_spotify_fetchers_task
+start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> start_spotify_fetchers_task
 
 
