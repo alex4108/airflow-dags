@@ -21,14 +21,20 @@ dag = DAG(
     description='A DAG to fetch Spotify track details',
     schedule_interval=timedelta(days=1),
 )
+def get_spotify_track_id(url):
+    parts = url.split('/')
+    track_id = parts[-1]
+    track_id = track_id.split('?')[0]
+    return track_id
 
 def fetch_track_details(url):
     try:
-        response = requests.get(f"https://api.spotify.com/v1/tracks/{url}")
+        id = get_spotify_track_id(url)
+        response = requests.get(f"https://api.spotify.com/v1/tracks/{id}")
         response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
         return response.json()
     except requests.RequestException as e:
-        raise AirflowFailException(f"Failed to fetch track details for URL {url}: {str(e)}")
+        raise AirflowFailException(f"Failed to fetch track details for ID/URL {id} / {url}: {str(e)}")
 
 def filter_urls(**kwargs):
     ti = kwargs['ti']
@@ -48,7 +54,8 @@ def filter_urls(**kwargs):
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
-def call_spotify_api_and_save(url, **kwargs):
+def call_spotify_api_and_save(**kwargs):
+    url = kwargs['url']
     track_details = fetch_track_details(url)
     insert_query = f"INSERT INTO spotify_track_details (url, track_details) VALUES ('{url}', '{track_details}')"
     insert_task = PostgresOperator(
@@ -59,10 +66,17 @@ def call_spotify_api_and_save(url, **kwargs):
     )
     insert_task.execute(context=kwargs)
 
-def determine_number_of_tasks(**kwargs):
+def spawn_spotify_fetchers_task(**kwargs):
     ti = kwargs['ti']
     filtered_urls = ti.xcom_pull(task_ids='filter_urls')
-    return len(filtered_urls)
+    for k, url in filtered_urls: 
+        task = PythonOperator(
+            task_id=f"call_spotify_api_and_save_{k}",
+            python_callable=call_spotify_api_and_save,
+            op_kwargs={'url': url},
+            provide_context=True,
+            dag=dag,
+        )
 
 start_task = PostgresOperator(
     task_id='check_db_healthy',
@@ -98,42 +112,13 @@ filter_urls_task = PythonOperator(
     dag=dag,
 )
 
-determine_number_of_tasks_task = PythonOperator(
-    task_id='determine_number_of_tasks',
-    python_callable=determine_number_of_tasks,
+spawn_spotify_fetchers_task = PythonOperator(
+    task_id='spawn_spotify_fetchers_task',
+    python_callable=spawn_spotify_fetchers_task,
     provide_context=True,
     dag=dag,
 )
 
-start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> determine_number_of_tasks_task
+start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> spawn_spotify_fetchers_task
 
-split_task = BranchPythonOperator(
-    task_id='split_task',
-    python_callable=lambda **kwargs: 'call_spotify_api_and_save' if kwargs['ti'].xcom_pull(task_ids='determine_number_of_tasks') > 0 else 'end',
-    provide_context=True,
-    dag=dag,
-)
 
-end_task = PostgresOperator(
-    task_id='end',
-    postgres_conn_id='spotify_history_saver',
-    sql="SELECT 1",
-    dag=dag,
-)
-
-determine_number_of_tasks_task >> split_task
-
-split_task >> end_task
-
-# Dynamic task creation for calling Spotify API and saving data
-filter_urls_task >> split_task
-
-for i in range(10):  # Max number of tasks, can be adjusted based on your needs
-    call_spotify_api_task = PythonOperator(
-        task_id=f'call_spotify_api_and_save_{i}',
-        python_callable=call_spotify_api_and_save,
-        op_kwargs={'url': f'url_{i}'},  # Pass the filtered URL as a parameter
-        provide_context=True,
-        dag=dag,
-    )
-    split_task >> call_spotify_api_task >> end_task
