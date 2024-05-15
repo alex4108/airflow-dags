@@ -69,7 +69,8 @@ def call_spotify_api_and_save(**kwargs):
 def start_spotify_fetchers(**kwargs):
     ti = kwargs['ti']
     filtered_urls = ti.xcom_pull(task_ids='filter_urls')
-    for k, url in filtered_urls: 
+    for k in filtered_urls: 
+        url = filtered_urls[k]
         task = PythonOperator(
             task_id=f"call_spotify_api_and_save_{k}",
             python_callable=call_spotify_api_and_save,
