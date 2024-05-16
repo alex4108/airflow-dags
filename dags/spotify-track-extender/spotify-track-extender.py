@@ -84,7 +84,7 @@ def flatten(l):
     new = []    
     for e in l:
         new.append(e[0])
-
+    return new
 
 def filter_urls(**kwargs):
     ti = kwargs['ti']
