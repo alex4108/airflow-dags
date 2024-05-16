@@ -30,10 +30,13 @@ def get_spotify_track_id(url):
     return track_id
 
 def fetch_track_details(url):
+    print(f"get detailed: {url}")
     try:
         id = get_spotify_track_id(url)
+        print(f"http inflight! get id: {id}")
         response = requests.get(f"https://api.spotify.com/v1/tracks/{id}")
         response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
+        print("http ok!!")
         return response.json()
     except requests.RequestException as e:
         raise AirflowFailException(f"Failed to fetch track details for ID/URL {id} / {url}: {str(e)}")
@@ -58,7 +61,9 @@ def filter_urls(**kwargs):
 
 def call_spotify_api_and_save(**kwargs):
     url = kwargs['url']
+    print(f"exec fetch: {url}")
     track_details = fetch_track_details(url)
+    print("got detailed!")
     insert_query = f"INSERT INTO spotify_track_details (url, track_details) VALUES ('{url}', '{track_details}')"
     insert_task = PostgresOperator(
         task_id=f'insert_track_details_{url}',
@@ -66,6 +71,7 @@ def call_spotify_api_and_save(**kwargs):
         sql=insert_query,
         dag=dag,
     )
+    print("trying psql insert")
     insert_task.execute(context=kwargs)
 
 start_task = PostgresOperator(
@@ -123,8 +129,9 @@ def spawn_fetchers(**kwargs):
         )
         #fetch_task.set_upstream(kwargs['start_task'])
         #fetch_task.set_downstream(kwargs['end_task'])
+        print("exec fetch")
         fetch_task.execute(context=kwargs)
-        
+        print("fetch done")
         #start_task >> fetch_task >> end_task
 
 spawn_fetchers_task = PythonOperator(
