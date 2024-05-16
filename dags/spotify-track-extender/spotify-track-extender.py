@@ -61,7 +61,7 @@ def filter_urls(**kwargs):
         output = []
         k = 0
         for url in filtered_urls:
-            output.append({'url': url})
+            output.append({'op_kwargs': {'url': url}})
             k += 1
         return output
     except Exception as e:
