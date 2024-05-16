@@ -4,7 +4,11 @@ from airflow.operators.postgres_operator import PostgresOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.exceptions import AirflowFailException
+from airflow.models import Variable
+
 import requests
+import base64
+
 
 default_args = {
     'owner': 'airflow',
@@ -26,6 +30,33 @@ dag = DAG(
     max_active_runs=1
 )
 
+
+def get_access_token():
+    # TODO Pull these in from K8s
+    client_id = Variable.get("SPOTIFY_CLIENT_ID")
+    client_secret = Variable.get("SPOTIFY_CLIENT_SECRET")
+    
+    auth_string = f"{client_id}:{client_secret}"
+    encoded_auth_string = base64.b64encode(auth_string.encode()).decode()
+
+    auth_options = {
+        'url': 'https://accounts.spotify.com/api/token',
+        'headers': {
+            'Authorization': 'Basic ' + encoded_auth_string
+        },
+        'form': {
+            'grant_type': 'client_credentials'
+        }
+    }
+
+    response = requests.post(auth_options['url'], headers=auth_options['headers'], data=auth_options['form'])
+    response_json = response.json()
+
+    if 'access_token' in response_json:
+        return response_json['access_token']
+    else:
+        raise AirflowFailException("Failed to obtain access token")
+
 def get_spotify_track_id(url):
     parts = url.split('/')
     track_id = parts[-1]
@@ -37,7 +68,12 @@ def fetch_track_details(url):
     try:
         id = get_spotify_track_id(url)
         print(f"http inflight! get id: {id}")
-        response = requests.get(f"https://api.spotify.com/v1/tracks/{id}")
+        access_token = get_access_token()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.get(f"https://api.spotify.com/v1/tracks/{id}", headers=headers)
         response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
         print("http ok!!")
         return response.json()
@@ -67,7 +103,7 @@ def filter_urls(**kwargs):
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
-def call_spotify_api_and_save(url, **kwargs):
+def get_track_data(url, **kwargs):
     print(f"exec fetch: {url}")
     track_details = fetch_track_details(url)
     print("got detailed!")
@@ -120,9 +156,9 @@ end_task = DummyOperator(
     dag=dag,
 )
 
-call_spotify_api_and_save_task = PythonOperator.partial(
+get_track_data_task = PythonOperator.partial(
     task_id="save",
-    python_callable=call_spotify_api_and_save,
+    python_callable=get_track_data,
     dag=dag,
 ).expand_kwargs(XComArg(filter_urls_task))
 
