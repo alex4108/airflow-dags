@@ -103,7 +103,7 @@ def filter_urls(**kwargs):
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
-def get_track_data(url, **kwargs):
+def call_spotify_api_and_save(url, **kwargs):
     print(f"exec fetch: {url}")
     track_details = fetch_track_details(url)
     print("got detailed!")
@@ -156,9 +156,9 @@ end_task = DummyOperator(
     dag=dag,
 )
 
-get_track_data_task = PythonOperator.partial(
+call_spotify_api_and_save_task = PythonOperator.partial(
     task_id="save",
-    python_callable=get_track_data,
+    python_callable=call_spotify_api_and_save,
     dag=dag,
 ).expand_kwargs(XComArg(filter_urls_task))
 
