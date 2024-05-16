@@ -118,16 +118,19 @@ def spawn_fetchers(**kwargs):
         fetch_task = PythonOperator(
             task_id=f"fetcher_{k}",
             python_callable=call_spotify_api_and_save,
-            provide_context=True,
+            provide_context=False,
             op_kwargs={'url': url},
             dag=dag,
         )
-        #task.execute(context=kwargs)
-        start_task >> fetch_task >> end_task
+        fetch_task.set_upstream(kwargs['start_task'])
+        fetch_task.set_downstream(kwargs['end_task'])
+        fetch_task.execute()
+        #start_task >> fetch_task >> end_task
 
 spawn_fetchers_task = PythonOperator(
     task_id="spawn_fetchers",
     python_callable=spawn_fetchers,
+    op_kwargs={'start_task': start_task, 'end_task': end_task},
     provide_context=True,
     dag=dag,
 )
