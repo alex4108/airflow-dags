@@ -107,7 +107,7 @@ def filter_urls(**kwargs):
 
         imported_track_urls = []
         for url_list in imported_track_urls_list_list:
-            urls.append(url_list[0])
+            imported_track_urls.append(url_list[0])
 
         print('imported+flattened')
         print(str(imported_track_urls))
