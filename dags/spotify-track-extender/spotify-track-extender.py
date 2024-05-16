@@ -124,6 +124,6 @@ call_spotify_api_and_save_task = PythonOperator.partial(
     task_id="save",
     python_callable=call_spotify_api_and_save,
     dag=dag,
-).expand_kwargs(XComArg(filter_urls_task))
+).expand_kwargs([XComArg(filter_urls_task)])
 
 start_task >> create_table_task >> get_all_played_spotify_urls_task >> filter_urls_task >> call_spotify_api_and_save_task >> end_task
