@@ -21,6 +21,9 @@ dag = DAG(
     default_args=default_args,
     description='A DAG to fetch Spotify track details',
     schedule_interval=timedelta(days=1),
+    catchup=False,
+    concurrency=4,
+    max_active_runs=1
 )
 
 def get_spotify_track_id(url):
@@ -149,12 +152,11 @@ end_task = DummyOperator(
 #     dag=dag,
 # )
 
-call_spotify_api_and_save_task = PythonOperator(
+call_spotify_api_and_save_task = PythonOperator.partial(
     task_id="save",
     python_callable=call_spotify_api_and_save,
-    provide_context=True,
     dag=dag,
-).expand(
+).expand_kwargs(
     url=XComArg(filter_urls_task)
 )
 
