@@ -26,7 +26,7 @@ dag = DAG(
     description='A DAG to fetch Spotify track details',
     schedule_interval=timedelta(days=1),
     catchup=False,
-    concurrency=4,
+    concurrency=1,
     max_active_runs=1
 )
 
@@ -91,10 +91,24 @@ def filter_urls(**kwargs):
         dag=dag,
     )
     
+    print('filter urls')
+
     try:
         imported_track_urls = get_imported_track_details_task.execute(context=kwargs)
+        print('orig')
+        print(str(urls))
+
+        print('imported')
+        print(str(imported_track_urls))
+
         imported_track_urls_set = set(imported_track_urls)  # Convert to set for faster lookup
+        print('set')
+        print(str(imported_track_urls_set))
+        
         filtered_urls = [url for url in urls if url not in imported_track_urls_set]
+        print('filtered')
+        print(str(filtered_urls))
+        
         output = []
         k = 0
         for url in filtered_urls:
