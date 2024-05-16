@@ -82,7 +82,7 @@ def fetch_track_details(url):
 
 def filter_urls(**kwargs):
     ti = kwargs['ti']
-    urls = ti.xcom_pull(task_ids='get_all_played_spotify_urls')
+    urls_list_list = ti.xcom_pull(task_ids='get_all_played_spotify_urls')
     
     get_imported_track_details_task = PostgresOperator(
         task_id='get_imported_track_details',
@@ -90,22 +90,30 @@ def filter_urls(**kwargs):
         sql="SELECT DISTINCT url FROM spotify_track_details",
         dag=dag,
     )
-    
+    urls = []
+
+    for url_list in urls_list_list:
+        urls.append(url_list[0])
+
     print('filter urls')
 
     try:
-        imported_track_urls = get_imported_track_details_task.execute(context=kwargs)
+        imported_track_urls_list_list = get_imported_track_details_task.execute(context=kwargs)
         print('orig')
         print(str(urls))
 
         print('imported')
+        print(str(imported_track_urls_list_list))
+
+        imported_track_urls = []
+        for url_list in imported_track_urls_list_list:
+            urls.append(url_list[0])
+
+        print('imported+flattened')
         print(str(imported_track_urls))
 
-        imported_track_urls_set = set(imported_track_urls)  # Convert to set for faster lookup
-        print('set')
-        print(str(imported_track_urls_set))
+        filtered_urls = [url for url in urls if url not in imported_track_urls]
         
-        filtered_urls = [url for url in urls if url not in imported_track_urls_set]
         print('filtered')
         print(str(filtered_urls))
         
