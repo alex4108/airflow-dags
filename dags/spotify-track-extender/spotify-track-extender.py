@@ -121,8 +121,8 @@ def spawn_fetchers(**kwargs):
             op_kwargs={'url': url},
             dag=dag,
         )
-        fetch_task.set_upstream(kwargs['start_task'])
-        fetch_task.set_downstream(kwargs['end_task'])
+        #fetch_task.set_upstream(kwargs['start_task'])
+        #fetch_task.set_downstream(kwargs['end_task'])
         fetch_task.execute(context=kwargs)
         
         #start_task >> fetch_task >> end_task
