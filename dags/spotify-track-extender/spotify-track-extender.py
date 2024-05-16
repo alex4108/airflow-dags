@@ -103,11 +103,14 @@ def filter_urls(**kwargs):
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
+def escapeSingleQuotes(input_str):
+    return input_str.replace("'", "''")
+
 def call_spotify_api_and_save(url, **kwargs):
     print(f"exec fetch: {url}")
     track_details = fetch_track_details(url)
     print("got detailed!")
-    track_details_str = json.dumps(track_details)
+    track_details_str = escapeSingleQuotes(json.dumps(track_details))
     insert_query = f"INSERT INTO spotify_track_details (url, track_details) VALUES ('{url}', '{track_details_str}')"
     id = get_spotify_track_id(url)
     insert_task = PostgresOperator(
