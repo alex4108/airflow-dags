@@ -117,8 +117,11 @@ def spawn_fetchers(**kwargs):
     ti = kwargs['ti']
     urls = ti.xcom_pull(task_ids='filter_urls')
     
-    start_task = ti.xcom_pull(task_ids='check_db_healthy')
-    end_task = ti.xcom_pull(task_ids='end')
+    start_task = ti.xcom_pull(task_ids='check_db_healthy')[0]
+    end_task = ti.xcom_pull(task_ids='end')[0]
+    
+    print(str(start_task))
+    print(str(end_task))
     
     print(str(urls))
     for k in range(0, len(urls)-1):
