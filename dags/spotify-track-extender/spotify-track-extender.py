@@ -108,8 +108,9 @@ def call_spotify_api_and_save(url, **kwargs):
     track_details = fetch_track_details(url)
     print("got detailed!")
     insert_query = f"INSERT INTO spotify_track_details (url, track_details) VALUES ('{url}', '{track_details}')"
+    id = get_spotify_track_id(url)
     insert_task = PostgresOperator(
-        task_id=f'insert_track_details_{url}',
+        task_id=f'insert_track_details_{id}',
         postgres_conn_id='spotify_history_saver',
         sql=insert_query,
         dag=dag,
