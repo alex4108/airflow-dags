@@ -93,7 +93,8 @@ def filter_urls(**kwargs):
     
     try:
         imported_track_urls = get_imported_track_details_task.execute(context=kwargs)
-        filtered_urls = [url for sublist in urls for url in sublist if url not in imported_track_urls]
+        imported_track_urls_set = set(imported_track_urls)  # Convert to set for faster lookup
+        filtered_urls = [url for url in urls if url not in imported_track_urls_set]
         output = []
         k = 0
         for url in filtered_urls:
