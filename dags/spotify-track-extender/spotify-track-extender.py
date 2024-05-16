@@ -110,11 +110,13 @@ end_task = DummyOperator(
 def spawn_fetchers(**kwargs):
     ti = kwargs['ti']
     urls = ti.xcom_pull(task_ids='filter_urls')
-    
+    print(str(urls))
     for k in range(0, len(urls)-1):
+        print(str(k))
         url = urls[k]
+        print(str(url))
         fetch_task = PythonOperator(
-            task_id=f"fetcher_${k}",
+            task_id=f"fetcher_{k}",
             python_callable=call_spotify_api_and_save,
             provide_context=True,
             op_kwargs={'url': url},
