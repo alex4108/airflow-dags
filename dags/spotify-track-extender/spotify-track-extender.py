@@ -58,7 +58,12 @@ def filter_urls(**kwargs):
     try:
         imported_track_urls = get_imported_track_details_task.execute(context=kwargs)
         filtered_urls = [url for sublist in urls for url in sublist if url not in imported_track_urls]
-        return filtered_urls
+        filtered_urls_dict = {}
+        k = 0
+        for url in filtered_urls:
+            filtered_urls_dict[k] = url
+            k += 1
+        return filtered_urls_dict
     except Exception as e:
         raise AirflowFailException(f"Failed to filter URLs: {str(e)}")
 
@@ -114,42 +119,6 @@ end_task = DummyOperator(
     task_id='end',
     dag=dag,
 )
-
-# def spawn_fetchers(**kwargs):
-#     ti = kwargs['ti']
-#     urls = ti.xcom_pull(task_ids='filter_urls')
-    
-#     start_task = ti.xcom_pull(task_ids='check_db_healthy')[0]
-#     end_task = ti.xcom_pull(task_ids='end')[0]
-    
-#     print(str(start_task))
-#     print(str(end_task))
-    
-#     print(str(urls))
-#     for k in range(0, len(urls)-1):
-#         print(str(k))
-#         url = urls[k]
-#         print(str(url))
-#         fetch_task = PythonOperator(
-#             task_id=f"fetcher_{k}",
-#             python_callable=call_spotify_api_and_save,
-#             op_kwargs={'url': url},
-#             dag=dag,
-#         )
-#         #fetch_task.set_upstream(kwargs['start_task'])
-#         #fetch_task.set_downstream(kwargs['end_task'])
-#         #fetch_task.execute(context=kwargs)
-
-#         print("exec fetch")
-#         start_task >> fetch_task >> end_task
-#         print("fetch done")
-        
-# spawn_fetchers_task = PythonOperator(
-#     task_id="spawn_fetchers",
-#     python_callable=spawn_fetchers,
-#     provide_context=True,
-#     dag=dag,
-# )
 
 call_spotify_api_and_save_task = PythonOperator.partial(
     task_id="save",
