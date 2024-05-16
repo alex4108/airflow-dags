@@ -116,6 +116,10 @@ end_task = DummyOperator(
 def spawn_fetchers(**kwargs):
     ti = kwargs['ti']
     urls = ti.xcom_pull(task_ids='filter_urls')
+    
+    start_task = ti.xcom_pull(task_ids='check_db_healthy')
+    end_task = ti.xcom_pull(task_ids='end')
+    
     print(str(urls))
     for k in range(0, len(urls)-1):
         print(str(k))
@@ -129,15 +133,14 @@ def spawn_fetchers(**kwargs):
         )
         #fetch_task.set_upstream(kwargs['start_task'])
         #fetch_task.set_downstream(kwargs['end_task'])
+        #fetch_task.execute(context=kwargs)
         print("exec fetch")
-        fetch_task.execute(context=kwargs)
+        start_task >> fetch_task >> end_task
         print("fetch done")
-        #start_task >> fetch_task >> end_task
-
+        
 spawn_fetchers_task = PythonOperator(
     task_id="spawn_fetchers",
     python_callable=spawn_fetchers,
-    op_kwargs={'start_task': start_task, 'end_task': end_task},
     provide_context=True,
     dag=dag,
 )
