@@ -114,7 +114,7 @@ def spawn_fetchers(**kwargs):
     for k in range(0, len(urls)-1):
         url = urls[k]
         fetch_task = PythonOperator(
-            task_id="spawn_fetchers",
+            task_id=f"fetcher_${k}",
             python_callable=call_spotify_api_and_save,
             provide_context=True,
             op_kwargs={'url': url},
